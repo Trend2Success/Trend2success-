@@ -6,6 +6,10 @@ interview or sales call, and records the follow-up outcome.
 
 See [docs/flow.md](docs/flow.md) for the flow diagram and a module-by-module breakdown.
 
+The same agent pattern also models a concrete sales funnel — see
+[docs/hvac_funnel.md](docs/hvac_funnel.md) for an HVAC lead-to-recurring-revenue example
+(`python -m trend2success.hvac.main`).
+
 ## Install
 
 ```bash
