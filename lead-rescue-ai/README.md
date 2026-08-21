@@ -4,9 +4,10 @@ Converts missed calls and new web leads into booked appointments for local
 home-service businesses. First response to a lead must go out in under 60
 seconds and end in one of: booked, handed to staff, marked lost, or opted out.
 
-## Status: vertical slice 1 — tenant foundation + lead intake
+## Status
 
-This slice implements the foundation everything else depends on:
+**Slice 1 — tenant foundation + lead intake.** The foundation everything
+else depends on:
 
 - Multi-tenant schema (`tenants`, `profiles` with roles, `leads`, an
   append-only `lead_events` audit log) with Postgres RLS enforcing tenant
@@ -17,8 +18,28 @@ This slice implements the foundation everything else depends on:
 - A role-gated `/leads` dashboard that lists a tenant's leads (or, for
   `platform_admin`, all tenants').
 
-Not in this slice: the AI reply engine, human takeover UI, SMS sending,
-staff invites UI, and reporting. Those are separate vertical slices.
+**Slice 2 — AI first response.** Serves the MVP's core success metric
+directly: getting a compliant response out within the 60-second SLA.
+
+- `src/lib/ai/generate-first-response.ts` drafts a short SMS reply via
+  Claude, constrained by the system prompt in `src/lib/ai/system-prompt.ts`
+  (never quote a price, never commit to a specific appointment time, never
+  diagnose the problem, never invent a fact about the business).
+- `src/lib/ai/guardrail-filter.ts` is a deterministic backstop: it scans
+  every AI draft for the same three categories before anything is sent, and
+  blocks the send if it trips. This exists so a bad model output can't
+  reach a customer just because the prompt didn't hold — it's a second,
+  independent check, not a replacement for the prompt.
+- `src/lib/lead-response.ts` orchestrates it: generate → guardrail check →
+  send via Twilio → mark the lead `contacted`. Anything that doesn't reach
+  a clean send (no consent, no phone, generation failure, a guardrail hit,
+  or an SMS send failure) instead moves the lead to `human_review` — a
+  lead is never silently dropped. Every branch writes a `lead_events` row.
+- If `ANTHROPIC_API_KEY` or the Twilio variables aren't configured, new
+  leads go straight to `human_review` rather than the webhook failing.
+
+Not yet built: the human takeover UI, staff invites, and reporting. Those
+are separate vertical slices.
 
 ## Setup
 
@@ -68,6 +89,11 @@ curl -X POST "http://localhost:3000/api/webhooks/leads/<tenant-id>" \
   -d "$BODY"
 ```
 
+With `ANTHROPIC_API_KEY` and the Twilio variables set, this also drafts and
+sends the first-response SMS and moves the lead to `contacted` (or
+`human_review` if anything about that didn't go cleanly) before the webhook
+responds. Check that tenant's `lead_events` rows to see what happened.
+
 ## Tests
 
 ```bash
@@ -77,8 +103,11 @@ npm test
 ```
 
 `npm test` covers the pure logic: webhook signature verification (valid,
-forged, tampered, missing, malformed) and the lead state machine (every
-transition the MVP's core states allow and forbid).
+forged, tampered, missing, malformed), the lead state machine (every
+transition the MVP's core states allow and forbid), the guardrail filter
+(price/availability/diagnosis violations, plus messages that should pass),
+and the first-response orchestrator (using fakes for Supabase, the AI
+generator, and the SMS sender — no network calls in the test suite).
 
 ### RLS verification
 
@@ -110,8 +139,16 @@ start` local) project:
 - **Webhook signatures**: every inbound webhook must carry a valid
   HMAC-SHA256 signature, verified with a constant-time comparison, checked
   against that specific tenant's own secret.
-- **No API keys in the browser**: `SUPABASE_SERVICE_ROLE_KEY` and
-  `LEAD_WEBHOOK_SIGNING_SECRET` are read only in server-side code
-  (`src/lib/supabase/server.ts`, the webhook route handler); the browser
-  client only ever uses the public anon key, which is safe precisely
-  because RLS — not secrecy — is what protects the data.
+- **AI cannot quote prices, guarantee availability, diagnose problems, or
+  invent facts**: enforced twice — the system prompt instructs the model
+  never to do these, and `guardrail-filter.ts` independently scans every
+  draft before it can be sent, escalating to `human_review` on a hit.
+- **A human can take over immediately**: any lead the AI can't confidently
+  and compliantly handle — no consent, no phone, a generation failure, a
+  guardrail hit, an SMS failure — lands in `human_review`, not silently
+  dropped or retried indefinitely.
+- **No API keys in the browser**: `SUPABASE_SERVICE_ROLE_KEY`,
+  `ANTHROPIC_API_KEY`, and the Twilio credentials are read only in
+  server-side code (`src/lib/supabase/server.ts`, the webhook route
+  handler); the browser client only ever uses the public anon key, which is
+  safe precisely because RLS — not secrecy — is what protects the data.

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/webhook-signature";
 import { leadIntakeSchema, FIRST_RESPONSE_SLA_MS } from "@/lib/lead-intake";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { ClaudeFirstResponseGenerator } from "@/lib/ai/generate-first-response";
+import { TwilioSmsSender } from "@/lib/sms/sms-sender";
+import { respondToNewLead, escalateNewLeadToHumanReview } from "@/lib/lead-response";
 
 const SIGNATURE_HEADER = "x-lead-signature";
 const UNIQUE_VIOLATION = "23505";
@@ -110,5 +113,35 @@ export async function POST(
     console.error("Failed to write lead_events row for lead", lead.id, eventError);
   }
 
+  await driveFirstResponse(supabase, {
+    id: lead.id,
+    tenant_id: tenant.id,
+    name: payload.name ?? null,
+    phone: payload.phone ?? null,
+    source: payload.source,
+    sms_consent: payload.sms_consent,
+  });
+
   return NextResponse.json({ id: lead.id, status: lead.status }, { status: 201 });
+}
+
+async function driveFirstResponse(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  lead: Parameters<typeof respondToNewLead>[1],
+) {
+  const { ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } = process.env;
+
+  if (!ANTHROPIC_API_KEY || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
+    await escalateNewLeadToHumanReview(supabase, lead, "ai_or_sms_not_configured");
+    return;
+  }
+
+  await respondToNewLead(
+    {
+      supabase,
+      generator: new ClaudeFirstResponseGenerator(ANTHROPIC_API_KEY),
+      sms: new TwilioSmsSender(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER),
+    },
+    lead,
+  );
 }
