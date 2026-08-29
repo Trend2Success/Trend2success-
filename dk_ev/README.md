@@ -13,7 +13,7 @@ contests alike.
 ```
 dk_ev/
   domain.py           Player / Lineup value objects
-  rules.py             DK slot rules per sport (NFL, NBA, MLB)
+  rules.py             DK slot rules per sport (NFL, NBA, MLB, CFB)
   data/
     interfaces.py       Protocols: SalarySource, ProjectionSource, OwnershipSource
     csv_sources.py       CSV-backed implementations (DK export + user projections/ownership)
@@ -31,7 +31,7 @@ dk_ev/
   cli.py / __main__.py CLI entry point
   api/                 FastAPI app
 frontend/              React + Vite + Tailwind UI
-sample_data/           A ready-to-run NFL slate (salaries + projections)
+sample_data/           Ready-to-run NFL and CFB (college football) slates
 ```
 
 Every data input (salaries, projections, ownership) is defined as a
@@ -62,6 +62,9 @@ python -m dk_ev optimize --sport nfl --contest cash --lineups 5
 
 # Your own DK salary export + projections
 python -m dk_ev optimize --salaries my_slate.csv --projections my_projections.csv
+
+# College football (CFB): QB, RB, RB, WR, WR, WR, FLEX (RB/WR), SFLEX (QB/RB/WR) — no TE/DST
+python -m dk_ev optimize --sport cfb --salaries sample_data/cfb_salaries.csv --projections sample_data/cfb_projections.csv
 
 # Force a player in every lineup, ban another, require a QB+1 pass-catcher stack
 python -m dk_ev optimize --lock 1049 --ban 1032 --stack 1
@@ -99,6 +102,11 @@ npm run dev
 ```
 
 ## Data inputs
+
+The bundled sample slate is NFL-only; pass `--salaries` (CLI) or
+`salaries_csv` (API) explicitly for NBA/MLB/CFB — the app refuses to run
+another sport's rules against the NFL sample data, since that would
+silently mix a college football roster with NFL players.
 
 - **Salaries** (`--salaries`): a DK contest export CSV — `Position, Name,
   Salary, Team, Opponent, AvgPointsPerGame` (a few common header variants,

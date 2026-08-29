@@ -76,10 +76,28 @@ MLB_RULES = SportRules(
     roster_size=10,
 )
 
+CFB_RULES = SportRules(
+    sport="cfb",
+    salary_cap=50_000,
+    # DK's college football Classic slate has no TE or DST: tight ends are
+    # pooled into the WR position, and DK does not score CFB team defenses.
+    slots=("QB", "RB", "RB", "WR", "WR", "WR", "FLEX", "SFLEX"),
+    slot_eligibility={
+        "QB": ("QB",),
+        "RB": ("RB",),
+        "WR": ("WR",),
+        "FLEX": ("RB", "WR"),
+        "SFLEX": ("QB", "RB", "WR"),
+    },
+    max_players_per_team=5,
+    roster_size=8,
+)
+
 SPORT_RULES: dict[str, SportRules] = {
     "nfl": NFL_RULES,
     "nba": NBA_RULES,
     "mlb": MLB_RULES,
+    "cfb": CFB_RULES,
 }
 
 

@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     opt = sub.add_parser("optimize", help="Generate and rank DK lineups by simulated EV")
-    opt.add_argument("--sport", default="nfl", choices=["nfl", "nba", "mlb"])
+    opt.add_argument("--sport", default="nfl", choices=["nfl", "nba", "mlb", "cfb"])
     opt.add_argument("--contest", default="gpp", choices=["cash", "gpp", "balanced"])
     opt.add_argument("--alpha", type=float, default=0.5, help="balanced-mode GPP/cash blend, 0=cash..1=gpp")
     opt.add_argument("--lineups", type=int, default=20)
@@ -82,6 +82,14 @@ def _print_results(response, top: int | None) -> None:
 
 
 def cmd_optimize(args: argparse.Namespace) -> int:
+    if args.sport != "nfl" and args.salaries == str(DEFAULT_SALARIES):
+        print(
+            f"error: the bundled sample slate is NFL-only; pass --salaries "
+            f"(and ideally --projections) for a {args.sport.upper()} slate.",
+            file=sys.stderr,
+        )
+        return 2
+
     payout = None
     if args.payout_json:
         payout = load_payout_structure(args.payout_json, field_size=args.field_size)

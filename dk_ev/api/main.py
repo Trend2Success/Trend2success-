@@ -123,6 +123,15 @@ def optimize(payload: OptimizeRequestSchema, session: Session = Depends(get_db))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if payload.sport != "nfl" and not payload.salaries_csv:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"the bundled sample slate is NFL-only; supply salaries_csv "
+                f"(and ideally projections_csv) for a {payload.sport} slate."
+            ),
+        )
+
     salaries_path = (
         _write_temp_csv(payload.salaries_csv) if payload.salaries_csv else str(DEFAULT_SALARIES)
     )

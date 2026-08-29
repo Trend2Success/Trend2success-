@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const SPORTS = ["nfl", "nba", "mlb"];
+const SPORTS = ["nfl", "nba", "mlb", "cfb"];
 const CONTESTS = [
   { value: "cash", label: "Cash (50/50)" },
   { value: "gpp", label: "GPP (tournament)" },
