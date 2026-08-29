@@ -63,7 +63,7 @@ python -m dk_ev optimize --sport nfl --contest cash --lineups 5
 # Your own DK salary export + projections
 python -m dk_ev optimize --salaries my_slate.csv --projections my_projections.csv
 
-# College football (CFB): QB, RB, RB, WR, WR, WR, FLEX (RB/WR), SFLEX (QB/RB/WR) — no TE/DST
+# College football (CFB): QB, RB, RB, WR, WR, WR, FLEX (RB/WR), S-FLEX (QB/RB/WR) — no TE/DST
 python -m dk_ev optimize --sport cfb --salaries sample_data/cfb_salaries.csv --projections sample_data/cfb_projections.csv
 
 # Force a player in every lineup, ban another, require a QB+1 pass-catcher stack

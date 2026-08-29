@@ -68,6 +68,17 @@ class SimulatorConfig:
     team_correlation: float = 0.15
     random_seed: int | None = None
     use_numba: bool = True
+    # On deep slates (hundreds of marginal players, e.g. CFB/MLB), sampling
+    # a field lineup's slot from the *entire* eligible pool means every
+    # phantom opponent has real odds of drawing several irrelevant players
+    # regardless of how small each one's individual ownership is -- 400
+    # players at 0.2% apiece is 80% of the draw. That systematically makes
+    # the simulated field weaker than a real one (real opponents don't
+    # roster $3,000 zero-projection bench players in appreciable numbers).
+    # Truncating each slot's field-sampling pool to the players covering
+    # this fraction of that slot's total ownership keeps field composition
+    # realistic without touching the candidate list used by the optimizer.
+    field_pool_coverage: float = 0.99
 
 
 @dataclass
@@ -130,9 +141,23 @@ class EVSimulator:
             weights = np.array(
                 [max(self.players[i].ownership_pct, 0.01) for i in idx], dtype=float
             )
+            idx, weights = self._truncate_to_coverage(np.array(idx), weights)
             weights = weights / weights.sum()
-            self.slot_eligible_idx.append(np.array(idx))
+            self.slot_eligible_idx.append(idx)
             self.slot_weights.append(weights)
+
+    def _truncate_to_coverage(
+        self, idx: np.ndarray, weights: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        coverage = self.config.field_pool_coverage
+        min_keep = min(len(idx), 5)
+        if coverage >= 1.0 or len(idx) <= min_keep:
+            return idx, weights
+        order = np.argsort(weights)[::-1]
+        cum = np.cumsum(weights[order])
+        cutoff = max(min_keep, int(np.searchsorted(cum, coverage * cum[-1]) + 1))
+        keep = order[:cutoff]
+        return idx[keep], weights[keep]
 
     def _simulate_player_scores(self, n_iterations: int) -> np.ndarray:
         rng = self._rng

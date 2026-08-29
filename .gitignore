@@ -1,7 +1,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
+/data/
 
 # dk_ev
 dk_ev.db

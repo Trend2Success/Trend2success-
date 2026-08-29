@@ -29,15 +29,15 @@ def test_get_rules_resolves_cfb():
 def test_cfb_roster_has_no_te_or_dst_slots():
     assert "TE" not in CFB_RULES.slots
     assert "DST" not in CFB_RULES.slots
-    assert CFB_RULES.slots == ("QB", "RB", "RB", "WR", "WR", "WR", "FLEX", "SFLEX")
+    assert CFB_RULES.slots == ("QB", "RB", "RB", "WR", "WR", "WR", "FLEX", "S-FLEX")
     assert CFB_RULES.roster_size == 8
     assert CFB_RULES.salary_cap == 50_000
 
 
 def test_sflex_accepts_qb_rb_or_wr():
-    assert CFB_RULES.player_eligible_for_slot(("QB",), "SFLEX")
-    assert CFB_RULES.player_eligible_for_slot(("RB",), "SFLEX")
-    assert CFB_RULES.player_eligible_for_slot(("WR",), "SFLEX")
+    assert CFB_RULES.player_eligible_for_slot(("QB",), "S-FLEX")
+    assert CFB_RULES.player_eligible_for_slot(("RB",), "S-FLEX")
+    assert CFB_RULES.player_eligible_for_slot(("WR",), "S-FLEX")
 
 
 def test_flex_accepts_rb_or_wr_but_not_qb():
