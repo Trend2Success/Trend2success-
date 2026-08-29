@@ -2,10 +2,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 data/
-
-# dk_ev
-dk_ev.db
 *.db
+.git/
 frontend/node_modules/
 frontend/dist/
-.env
+trend2success/
+tests/
+docs/

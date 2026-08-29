@@ -38,3 +38,9 @@ pipeline = Pipeline(search_agent=SearchAgent(sources=[my_source]))
 ```bash
 pytest
 ```
+
+## Also in this repo
+
+[`dk_ev/`](dk_ev/README.md) is a separate, standalone project: a DraftKings
+DFS lineup optimizer that ranks lineups by simulated Expected Value. See
+[dk_ev/README.md](dk_ev/README.md) for its own install/run instructions.

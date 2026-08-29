@@ -1,0 +1,12 @@
+ortools>=9.10
+numpy>=1.26
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlalchemy>=2.0
+pydantic>=2.6
+httpx>=0.27
+pytest>=7.4
+
+# Optional: accelerates the Monte Carlo simulator's inner loop when
+# installed. dk_ev works fine without it (falls back to vectorized NumPy).
+# numba>=0.59
