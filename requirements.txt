@@ -1,1 +1,12 @@
 pytest>=7.4
+
+# --- NCAAF DFS EV Optimizer (dfs_ev package) ---
+fastapi>=0.110
+pydantic>=2.5
+uvicorn>=0.29
+ortools>=9.9
+numpy>=1.26
+numba>=0.59
+sqlalchemy>=2.0
+httpx>=0.27
+python-dotenv>=1.0

@@ -1,0 +1,66 @@
+{
+  "_comment": "Synthetic sample data for offline/CI use. Structurally mirrors the fields dfs_ev.slate normalizes from OpticOdds API v3 (/fixtures/active, /fixtures/odds, /injuries), but player names, lines, and prices are fictional -- not real 2026 rosters or market data.",
+  "fixtures": [
+    {
+      "id": "202608298B55D789",
+      "league": "ncaaf",
+      "start_date": "2026-08-29T23:00:00Z",
+      "home_team": {"id": "team_osu", "name": "Ohio State Buckeyes", "abbreviation": "OSU"},
+      "away_team": {"id": "team_ysu", "name": "Youngstown State Penguins", "abbreviation": "YSU"},
+      "is_fcs_mismatch": true
+    }
+  ],
+  "players": [
+    {"id": "oo_1001", "name": "Marcus Whitfield", "team": "OSU", "position": "QB"},
+    {"id": "oo_1002", "name": "Trey Coleman", "team": "OSU", "position": "RB"},
+    {"id": "oo_1003", "name": "Dominic Reyes", "team": "OSU", "position": "RB"},
+    {"id": "oo_1004", "name": "Isaiah Brooks", "team": "OSU", "position": "WR"},
+    {"id": "oo_1005", "name": "Caleb Sanders", "team": "OSU", "position": "WR"},
+    {"id": "oo_1006", "name": "Nolan Priest", "team": "OSU", "position": "TE"},
+    {"id": "oo_2001", "name": "Jaylen Foster", "team": "YSU", "position": "QB"},
+    {"id": "oo_2002", "name": "Andre Mackey", "team": "YSU", "position": "RB"},
+    {"id": "oo_2003", "name": "Devin Ortiz", "team": "YSU", "position": "RB"},
+    {"id": "oo_2004", "name": "Malik Sweeney", "team": "YSU", "position": "WR"},
+    {"id": "oo_2005", "name": "Corey Nash", "team": "YSU", "position": "WR"},
+    {"id": "oo_2006", "name": "Ryan Whitlock", "team": "YSU", "position": "TE"}
+  ],
+  "game_odds": [
+    {"fixture_id": "202608298B55D789", "market": "moneyline", "team": "OSU", "sportsbook": "Pinnacle", "price": -20000},
+    {"fixture_id": "202608298B55D789", "market": "moneyline", "team": "YSU", "sportsbook": "Pinnacle", "price": 5000},
+    {"fixture_id": "202608298B55D789", "market": "point_spread", "team": "OSU", "sportsbook": "Pinnacle", "point": -38.5, "price": -110},
+    {"fixture_id": "202608298B55D789", "market": "point_spread", "team": "YSU", "sportsbook": "Pinnacle", "point": 38.5, "price": -110},
+    {"fixture_id": "202608298B55D789", "market": "total_points", "sportsbook": "Pinnacle", "point": 53.0, "price": -110, "side": "over"},
+    {"fixture_id": "202608298B55D789", "market": "team_total", "team": "OSU", "sportsbook": "Pinnacle", "point": 45.5, "price": -110, "side": "over"},
+    {"fixture_id": "202608298B55D789", "market": "team_total", "team": "YSU", "sportsbook": "Pinnacle", "point": 7.5, "price": -110, "side": "over"}
+  ],
+  "player_props": [
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1001", "market": "player_passing_yards", "sportsbook": "Pinnacle", "line": 305.5, "over_price": -112, "under_price": -108, "alt_lines": [[275.5, -180], [335.5, 140]]},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1001", "market": "player_passing_touchdowns", "sportsbook": "Pinnacle", "line": 3.5, "over_price": 105, "under_price": -130},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1001", "market": "anytime_touchdown_scorer", "sportsbook": "Pinnacle", "yes_price": 250, "no_price": -350},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1002", "market": "player_rushing_yards", "sportsbook": "Pinnacle", "line": 108.5, "over_price": -110, "under_price": -110, "alt_lines": [[88.5, -170], [128.5, 130]]},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1002", "market": "player_receptions", "sportsbook": "Pinnacle", "line": 2.5, "over_price": -120, "under_price": -105},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1002", "market": "anytime_touchdown_scorer", "sportsbook": "Pinnacle", "yes_price": -140, "no_price": 110},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1004", "market": "player_receiving_yards", "sportsbook": "Pinnacle", "line": 78.5, "over_price": -110, "under_price": -110, "alt_lines": [[58.5, -175], [98.5, 135]]},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1004", "market": "player_receptions", "sportsbook": "Pinnacle", "line": 5.5, "over_price": -115, "under_price": -105},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1004", "market": "anytime_touchdown_scorer", "sportsbook": "Pinnacle", "yes_price": 120, "no_price": -150},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1005", "market": "player_receiving_yards", "sportsbook": "Pinnacle", "line": 45.5, "over_price": -110, "under_price": -110},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_1005", "market": "player_receptions", "sportsbook": "Pinnacle", "line": 3.5, "over_price": -110, "under_price": -110},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2001", "market": "player_passing_yards", "sportsbook": "Pinnacle", "line": 195.5, "over_price": -110, "under_price": -110, "alt_lines": [[175.5, -160], [215.5, 125]]},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2001", "market": "player_passing_touchdowns", "sportsbook": "Pinnacle", "line": 1.5, "over_price": -105, "under_price": -125},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2001", "market": "anytime_touchdown_scorer", "sportsbook": "Pinnacle", "yes_price": 260, "no_price": -400},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2002", "market": "player_rushing_yards", "sportsbook": "Pinnacle", "line": 58.5, "over_price": -110, "under_price": -110},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2002", "market": "anytime_touchdown_scorer", "sportsbook": "Pinnacle", "yes_price": 180, "no_price": -230},
+
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2004", "market": "player_receiving_yards", "sportsbook": "Pinnacle", "line": 52.5, "over_price": -110, "under_price": -110},
+    {"fixture_id": "202608298B55D789", "player_id": "oo_2004", "market": "player_receptions", "sportsbook": "Pinnacle", "line": 4.5, "over_price": -110, "under_price": -110}
+  ],
+  "injuries": [
+    {"player_name": "Trey Coleman", "team": "OSU", "status": "DTD"},
+    {"player_name": "Devin Ortiz", "team": "YSU", "status": "OUT"}
+  ]
+}

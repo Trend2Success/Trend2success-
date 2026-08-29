@@ -1,0 +1,25 @@
+# Set OPTICODDS_API_KEY in your shell or a root .env file (see .env.example)
+# before running `docker compose up` -- it's optional for offline/sample-data use.
+services:
+  dfs_ev:
+    build: .
+    image: dfs_ev:latest
+    environment:
+      OPTICODDS_API_KEY: ${OPTICODDS_API_KEY:-}
+      DFS_EV_DB_PATH: /app/data/dfs_ev.sqlite3
+    volumes:
+      - ./data:/app/data
+    entrypoint: ["python", "-m", "dfs_ev"]
+    command: ["--help"]
+
+  dfs_ev_api:
+    build: .
+    image: dfs_ev:latest
+    environment:
+      OPTICODDS_API_KEY: ${OPTICODDS_API_KEY:-}
+      DFS_EV_DB_PATH: /app/data/dfs_ev.sqlite3
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    entrypoint: ["uvicorn", "dfs_ev.api:app", "--host", "0.0.0.0", "--port", "8000"]

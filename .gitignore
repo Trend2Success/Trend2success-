@@ -1,4 +1,13 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
+# Ignore everything else under data/ (caches, generated exports, local DB)
+# but keep the bundled sample fixtures -- a parent-directory ignore (e.g.
+# "data/") can't be un-ignored by a later "!" rule, so this uses "data/*".
+data/*
+!data/sample_opticodds/
+!data/sample_opticodds/**
+!data/sample_dk/
+!data/sample_dk/**
+*.sqlite3
+.env
