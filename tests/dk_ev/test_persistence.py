@@ -50,6 +50,7 @@ def test_save_and_load_run_round_trips_lineups():
         assert record.salary == lineup.salary
         assert len(record.roster) == 9
         assert record.roster[0]["player_id"] == "qb1"
+        assert record.roster[0]["leverage_score"] > 0
 
     with Session() as session:
         runs = list_runs(session)

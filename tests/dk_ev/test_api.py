@@ -66,6 +66,8 @@ def test_optimize_returns_ranked_lineups(client: TestClient):
     for lu in body["lineups"]:
         assert lu["salary"] <= 50_000
         assert len(lu["roster"]) == 9
+        assert lu["avg_leverage"] > 0
+        assert all(p["leverage_score"] > 0 for p in lu["roster"])
 
 
 def test_get_lineups_by_run_id(client: TestClient):

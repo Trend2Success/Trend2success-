@@ -22,7 +22,11 @@ export default function LineupCard({ lineup }) {
 
       <ul className="mb-3 divide-y divide-slate-800 text-sm">
         {lineup.roster.map((p) => (
-          <li key={`${lineup.rank}-${p.slot}-${p.player_id}`} className="flex justify-between py-1">
+          <li
+            key={`${lineup.rank}-${p.slot}-${p.player_id}`}
+            className="flex justify-between py-1"
+            title={`Leverage ${p.leverage_score.toFixed(2)} (proj / (own% + 0.5))`}
+          >
             <span className="text-slate-400">{p.slot}</span>
             <span className="text-slate-100">{p.name}</span>
             <span className="text-slate-500">${p.salary.toLocaleString()}</span>
@@ -54,6 +58,10 @@ export default function LineupCard({ lineup }) {
         <div>
           <div className="text-slate-200">{(lineup.top10_pct_rate * 100).toFixed(1)}%</div>
           Top 10%
+        </div>
+        <div>
+          <div className="text-slate-200">{lineup.avg_leverage.toFixed(2)}</div>
+          Leverage
         </div>
       </div>
     </div>

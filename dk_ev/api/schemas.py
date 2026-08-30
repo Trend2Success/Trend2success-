@@ -42,6 +42,7 @@ class LineupPlayerSchema(BaseModel):
     salary: int
     projected_points: float
     ownership_pct: float
+    leverage_score: float = 0.0
 
 
 class LineupResultSchema(BaseModel):
@@ -58,6 +59,7 @@ class LineupResultSchema(BaseModel):
     top10_pct_rate: float
     ceiling: float
     floor: float
+    avg_leverage: float
     roster: list[LineupPlayerSchema]
 
 

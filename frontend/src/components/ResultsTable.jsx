@@ -12,6 +12,7 @@ export default function ResultsTable({ lineups, selectedRank, onSelect }) {
             <th className="px-3 py-2">Own Sum</th>
             <th className="px-3 py-2">Ceiling</th>
             <th className="px-3 py-2">Floor</th>
+            <th className="px-3 py-2">Leverage</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
@@ -33,6 +34,7 @@ export default function ResultsTable({ lineups, selectedRank, onSelect }) {
               <td className="px-3 py-2">{lu.ownership_sum.toFixed(0)}%</td>
               <td className="px-3 py-2">{lu.ceiling.toFixed(1)}</td>
               <td className="px-3 py-2">{lu.floor.toFixed(1)}</td>
+              <td className="px-3 py-2">{lu.avg_leverage.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>

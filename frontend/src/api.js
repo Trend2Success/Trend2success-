@@ -13,6 +13,18 @@ export async function optimize(payload) {
   return res.json();
 }
 
+export async function listRuns() {
+  const res = await fetch(`${API_BASE}/runs`);
+  if (!res.ok) throw new Error(`Listing runs failed (${res.status})`);
+  return res.json();
+}
+
+export async function getRun(runId) {
+  const res = await fetch(`${API_BASE}/lineups/${runId}`);
+  if (!res.ok) throw new Error(`Loading run failed (${res.status})`);
+  return res.json();
+}
+
 export function exportCsvUrl(runId) {
   return `${API_BASE}/export/csv/${runId}`;
 }

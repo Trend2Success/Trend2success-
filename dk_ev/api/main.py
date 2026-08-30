@@ -63,6 +63,8 @@ def _write_temp_csv(content: str) -> str:
 
 
 def _record_to_schema(record: LineupRecord) -> LineupResultSchema:
+    leverage_scores = [p.get("leverage_score", 0.0) for p in record.roster]
+    avg_leverage = sum(leverage_scores) / len(leverage_scores) if leverage_scores else 0.0
     return LineupResultSchema(
         rank=record.rank,
         salary=record.salary,
@@ -77,6 +79,7 @@ def _record_to_schema(record: LineupRecord) -> LineupResultSchema:
         top10_pct_rate=record.top10_pct_rate,
         ceiling=record.ceiling,
         floor=record.floor,
+        avg_leverage=avg_leverage,
         roster=[LineupPlayerSchema(**p) for p in record.roster],
     )
 

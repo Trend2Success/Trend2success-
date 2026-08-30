@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import numpy as np
+import pytest
+
 from dk_ev.domain import Lineup
 from dk_ev.payouts import sample_gpp
 from dk_ev.rules import NFL_RULES
-from dk_ev.simulation.ev_simulator import EVSimulator, SimulatorConfig
+from dk_ev.simulation.ev_simulator import _HAS_NUMBA, EVSimulator, SimulatorConfig
 
 from .fixtures import make_player, small_nfl_slate
 
@@ -102,3 +105,39 @@ def test_win_rate_and_itm_are_bounded_probabilities():
     for pct in (result.itm_pct, result.win_pct, result.top1_pct_rate, result.top10_pct_rate):
         assert 0.0 <= pct <= 1.0
     assert result.win_pct <= result.top1_pct_rate <= result.top10_pct_rate <= result.itm_pct
+
+
+@pytest.mark.skipif(not _HAS_NUMBA, reason="numba not installed")
+def test_numba_kernel_matches_numpy_fallback_exactly():
+    """The numba-accelerated inner loop must be a drop-in replacement for
+    the vectorized numpy path -- same seed, same random draws consumed,
+    identical result.
+    """
+    slate = small_nfl_slate()
+    payout = sample_gpp(field_size=1_000, entry_fee=20.0)
+    lineup = build_lineup(
+        slate, ["qb1", "rb1", "rb2", "wr1", "wr2", "wr3", "te1", "rb3", "dst1"]
+    )
+
+    numba_config = SimulatorConfig(n_iterations=1000, field_sample_size=80, random_seed=99, use_numba=True)
+    numba_result = EVSimulator(slate, NFL_RULES, payout, numba_config).simulate(lineup)
+
+    numpy_config = SimulatorConfig(n_iterations=1000, field_sample_size=80, random_seed=99, use_numba=False)
+    numpy_result = EVSimulator(slate, NFL_RULES, payout, numpy_config).simulate(lineup)
+
+    assert numba_result.ev == numpy_result.ev
+    assert numba_result.itm_pct == numpy_result.itm_pct
+    assert numba_result.median_rank == numpy_result.median_rank
+
+
+@pytest.mark.skipif(not _HAS_NUMBA, reason="numba not installed")
+def test_numba_beaten_count_kernel_matches_numpy_on_random_data():
+    from dk_ev.simulation.ev_simulator import _count_beaten_numba, _count_beaten_numpy
+
+    rng = np.random.default_rng(0)
+    field_scores = rng.normal(150, 20, size=(500, 300))
+    candidate_scores = rng.normal(150, 20, size=500)
+
+    beaten_numba = _count_beaten_numba(field_scores, candidate_scores)
+    beaten_numpy = _count_beaten_numpy(field_scores, candidate_scores)
+    assert np.array_equal(beaten_numba, beaten_numpy)

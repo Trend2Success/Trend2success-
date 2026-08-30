@@ -19,6 +19,7 @@ def lineup_roster_json(result: SimulationResult) -> list[dict]:
             "salary": p.salary,
             "projected_points": p.projected_points,
             "ownership_pct": p.ownership_pct,
+            "leverage_score": p.leverage_score,
         }
         for slot, p in zip(lineup.slots, lineup.players)
     ]

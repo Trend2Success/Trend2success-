@@ -86,7 +86,8 @@ docker compose up --build
   /lineups/{run_id}`, `GET /export/csv/{run_id}`, interactive docs at
   `/docs`.
 - Frontend (React/Vite): http://localhost:5173 — generate lineups, inspect
-  them in the results table and lineup card, and export to a DK CSV.
+  them in the results table and lineup card (roster, salary bar, EV,
+  leverage), browse and reopen past runs, and export to a DK CSV.
 
 ### Run without Docker
 

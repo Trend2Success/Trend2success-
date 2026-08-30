@@ -1,14 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import OptimizeForm from "./components/OptimizeForm.jsx";
 import ResultsTable from "./components/ResultsTable.jsx";
 import LineupCard from "./components/LineupCard.jsx";
-import { optimize, downloadCsv } from "./api.js";
+import PastRuns from "./components/PastRuns.jsx";
+import { optimize, downloadCsv, listRuns, getRun } from "./api.js";
 
 export default function App() {
   const [response, setResponse] = useState(null);
   const [selectedRank, setSelectedRank] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [runs, setRuns] = useState([]);
+
+  async function refreshRuns() {
+    try {
+      setRuns(await listRuns());
+    } catch {
+      // past-runs list is a convenience; a failed fetch shouldn't block the page
+    }
+  }
+
+  useEffect(() => {
+    refreshRuns();
+  }, []);
 
   async function handleGenerate(payload) {
     setLoading(true);
@@ -17,11 +31,23 @@ export default function App() {
       const result = await optimize(payload);
       setResponse(result);
       setSelectedRank(result.lineups[0]?.rank ?? null);
+      refreshRuns();
     } catch (err) {
       setError(err.message);
       setResponse(null);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSelectRun(runId) {
+    setError(null);
+    try {
+      const result = await getRun(runId);
+      setResponse(result);
+      setSelectedRank(result.lineups[0]?.rank ?? null);
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -46,6 +72,10 @@ export default function App() {
       </header>
 
       <OptimizeForm onSubmit={handleGenerate} loading={loading} />
+
+      <div className="mt-6">
+        <PastRuns runs={runs} activeRunId={response?.run_id} onSelect={handleSelectRun} />
+      </div>
 
       {error && (
         <div className="mt-4 rounded-md border border-red-700 bg-red-950 px-4 py-2 text-sm text-red-300">
