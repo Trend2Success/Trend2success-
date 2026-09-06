@@ -4,6 +4,7 @@ __pycache__/
 data/
 
 # SlateEdge (slateedge/)
+slateedge/.env
 slateedge/optimizer-service/.venv/
 slateedge/web/node_modules/
 slateedge/web/.next/
