@@ -38,3 +38,11 @@ pipeline = Pipeline(search_agent=SearchAgent(sources=[my_source]))
 ```bash
 pytest
 ```
+
+## Other projects in this repository
+
+### SlateEdge
+
+`slateedge/` contains a separate, unrelated project: an independent DraftKings NFL DFS
+decision-support and lineup-construction web app (Next.js + FastAPI + Postgres), built for
+personal use. See [`slateedge/README.md`](slateedge/README.md) for setup and details.

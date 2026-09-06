@@ -2,3 +2,16 @@ __pycache__/
 *.pyc
 .pytest_cache/
 data/
+
+# SlateEdge (slateedge/)
+slateedge/.env
+slateedge/optimizer-service/.venv/
+slateedge/web/node_modules/
+slateedge/web/.next/
+slateedge/web/out/
+slateedge/web/.env
+slateedge/web/.env.local
+slateedge/web/test-results/
+slateedge/web/playwright-report/
+slateedge/web/playwright/.cache/
+slateedge/web/*.tsbuildinfo
