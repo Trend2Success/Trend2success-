@@ -14,10 +14,11 @@ export default async function LineupsPage() {
   const slate = await getActiveSlate();
   if (!slate) return <EmptyState title="No active slate" description="Create a slate and import players first." />;
 
-  const [players, settings, runs] = await Promise.all([
+  const [players, settings, runs, presets] = await Promise.all([
     prisma.player.findMany({ where: { slateId: slate.id }, orderBy: { salary: 'desc' } }),
     prisma.settings.findUnique({ where: { userId: user.id } }),
     prisma.lineupRun.findMany({ where: { slateId: slate.id }, include: { lineups: true }, orderBy: { createdAt: 'desc' }, take: 10 }),
+    prisma.lineupPreset.findMany({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } }),
   ]);
 
   if (players.length === 0) {
@@ -40,6 +41,7 @@ export default async function LineupsPage() {
         slateId={slate.id}
         salaryCapDefault={settings?.defaultSalaryCap ?? DEFAULT_SALARY_CAP}
         playerOptions={playerOptions}
+        savedPresets={presets.map((p) => ({ id: p.id, name: p.name, settingsJson: p.settingsJson }))}
       />
 
       <Card>

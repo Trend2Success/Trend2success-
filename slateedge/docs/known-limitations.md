@@ -49,11 +49,12 @@ on any number it shows you.
   slot, player name+ID or ID only). Contest operators' own upload formats change over time;
   always double-check the exported file against whatever you're about to upload it to before
   you use it.
-- **Results Tracker breakdowns** (contest type, buy-in tier, entry-size tier, slate) come
-  entirely from the results CSV you import. Breakdowns by stack construction, salary
-  remaining, or ownership range are only available for results you can tie back to a specific
-  SlateEdge-generated lineup (via `lineup_id` matching); most user-imported results won't have
-  that link unless you generated the lineup in SlateEdge first.
+- **Results Tracker breakdowns by stack construction, salary remaining, and ownership range**
+  require manually linking a result to a SlateEdge-generated lineup (a dropdown on each row in
+  "All tracked results" — the CSV's `lineup_id` is free text and isn't auto-matched, since it
+  usually refers to the contest operator's own entry ID, not an internal SlateEdge lineup).
+  Unlinked results still count fully in every other breakdown (sport, contest type, buy-in,
+  entry size, lineup count, slate).
 - **No native mobile app**, no authorized third-party projection API connectors, and no
   multi-user shared workspaces — all listed as "Planned" (and inert) on the Settings page for
   transparency rather than implemented as dead buttons.

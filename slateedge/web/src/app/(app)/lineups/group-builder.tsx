@@ -48,9 +48,9 @@ export function GroupBuilder({
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
         <div className="flex flex-col gap-1">
-          <Label>Group type</Label>
+          <Label htmlFor="group-type">Group type</Label>
           <Select value={type} onValueChange={(v) => setType(v as GroupRule['type'])}>
-            <SelectTrigger>
+            <SelectTrigger id="group-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -66,8 +66,9 @@ export function GroupBuilder({
         {type === 'if_then' ? (
           <>
             <div className="flex flex-col gap-1">
-              <Label>If player</Label>
+              <Label htmlFor="group-if-player">If player</Label>
               <select
+                id="group-if-player"
                 className="se-focus-ring h-9 rounded-md border border-graphite-600 bg-graphite-900 px-2 text-sm"
                 value={ifId}
                 onChange={(e) => setIfId(e.target.value)}
@@ -81,8 +82,9 @@ export function GroupBuilder({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <Label>Then player</Label>
+              <Label htmlFor="group-then-player">Then player</Label>
               <select
+                id="group-then-player"
                 className="se-focus-ring h-9 rounded-md border border-graphite-600 bg-graphite-900 px-2 text-sm"
                 value={thenId}
                 onChange={(e) => setThenId(e.target.value)}
@@ -99,8 +101,9 @@ export function GroupBuilder({
         ) : (
           <>
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <Label>Players (ctrl/cmd-click for multiple)</Label>
+              <Label htmlFor="group-players">Players (ctrl/cmd-click for multiple)</Label>
               <select
+                id="group-players"
                 multiple
                 className="se-focus-ring h-24 rounded-md border border-graphite-600 bg-graphite-900 px-2 text-sm"
                 value={selectedIds}
@@ -115,8 +118,8 @@ export function GroupBuilder({
             </div>
             {type !== 'exclude_together' ? (
               <div className="flex flex-col gap-1">
-                <Label>Count (N)</Label>
-                <Input type="number" min="1" value={count} onChange={(e) => setCount(e.target.value)} />
+                <Label htmlFor="group-count">Count (N)</Label>
+                <Input id="group-count" type="number" min="1" value={count} onChange={(e) => setCount(e.target.value)} />
               </div>
             ) : null}
           </>

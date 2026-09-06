@@ -7,6 +7,8 @@ import { CsvUploadCard } from '@/components/csv-upload-card';
 import { previewResultsCsvAction, commitResultsCsvAction } from '@/server/actions/imports';
 import { formatCents, formatPct } from '@/lib/utils';
 import { BankrollTrendChart, RoiByContestTypeChart, EntriesVsResultsChart } from './charts';
+import { LinkLineupSelect } from './link-lineup-select';
+import { DeleteResultButton } from './delete-result-button';
 
 function buyInTier(cents: number): string {
   const dollars = cents / 100;
@@ -25,13 +27,48 @@ function entrySizeTier(field: number | null): string {
   return 'Large field (5,000+)';
 }
 
+function lineupCountTier(n: number): string {
+  if (n <= 1) return '1 lineup';
+  if (n <= 5) return '2-5 lineups';
+  if (n <= 20) return '6-20 lineups';
+  return '21+ lineups';
+}
+
+function salaryRemainingTier(salaryUsed: number, cap = 50000): string {
+  const remaining = cap - salaryUsed;
+  if (remaining <= 200) return '$0-200 remaining';
+  if (remaining <= 1000) return '$200-1,000 remaining';
+  return '$1,000+ remaining';
+}
+
+function ownershipRangeTier(totalOwnership: number): string {
+  if (totalOwnership <= 60) return 'Low (≤60%)';
+  if (totalOwnership <= 100) return 'Medium (60-100%)';
+  return 'High (100%+)';
+}
+
 export default async function ResultsPage() {
   const user = await requireUser();
   const results = await prisma.contestResult.findMany({
     where: { slate: { userId: user.id } },
-    include: { slate: true },
+    include: { slate: true, linkedLineup: true },
     orderBy: { createdAt: 'asc' },
   });
+
+  const slateIds = [...new Set(results.map((r) => r.slateId))];
+  const lineupsBySlate = new Map<string, { id: string; label: string }[]>();
+  if (slateIds.length > 0) {
+    const lineups = await prisma.lineup.findMany({
+      where: { run: { slateId: { in: slateIds }, userId: user.id } },
+      include: { run: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    for (const l of lineups) {
+      const list = lineupsBySlate.get(l.run.slateId) ?? [];
+      list.push({ id: l.id, label: `${l.run.presetName} · $${l.salaryUsed.toLocaleString()} · ${new Date(l.createdAt).toLocaleDateString()}` });
+      lineupsBySlate.set(l.run.slateId, list);
+    }
+  }
 
   const totalEntries = results.reduce((s, r) => s + r.numberOfEntries, 0);
   const totalFees = results.reduce((s, r) => s + r.totalEntryFeesCents, 0);
@@ -39,30 +76,40 @@ export default async function ResultsPage() {
   const netPnl = results.reduce((s, r) => s + r.netProfitLossCents, 0);
   const roi = totalFees > 0 ? (netPnl / totalFees) * 100 : null;
   const distinctSlates = new Set(results.map((r) => r.slateId)).size;
+  const linkedResults = results.filter((r) => r.linkedLineup);
 
-  function breakdown<K extends string>(keyFn: (r: (typeof results)[number]) => K) {
+  function breakdown<T, K extends string>(source: T[], keyFn: (r: T) => K, metricsFn: (r: T) => { fees: number; winnings: number; net: number; entries: number }) {
     const map = new Map<K, { fees: number; winnings: number; net: number; entries: number; count: number }>();
-    for (const r of results) {
+    for (const r of source) {
       const key = keyFn(r);
+      const m = metricsFn(r);
       const entry = map.get(key) ?? { fees: 0, winnings: 0, net: 0, entries: 0, count: 0 };
-      entry.fees += r.totalEntryFeesCents;
-      entry.winnings += r.totalWinningsCents;
-      entry.net += r.netProfitLossCents;
-      entry.entries += r.numberOfEntries;
+      entry.fees += m.fees;
+      entry.winnings += m.winnings;
+      entry.net += m.net;
+      entry.entries += m.entries;
       entry.count += 1;
       map.set(key, entry);
     }
-    return [...map.entries()].map(([key, v]) => ({
-      key,
-      ...v,
-      roi: v.fees > 0 ? (v.net / v.fees) * 100 : null,
-    }));
+    return [...map.entries()].map(([key, v]) => ({ key, ...v, roi: v.fees > 0 ? (v.net / v.fees) * 100 : null }));
   }
 
-  const byContestType = breakdown((r) => r.contestType);
-  const byBuyIn = breakdown((r) => buyInTier(r.entryFeeCents));
-  const byEntrySize = breakdown((r) => entrySizeTier(r.fieldSize));
-  const bySlate = breakdown((r) => r.slate.slateName);
+  const metrics = (r: (typeof results)[number]) => ({
+    fees: r.totalEntryFeesCents,
+    winnings: r.totalWinningsCents,
+    net: r.netProfitLossCents,
+    entries: r.numberOfEntries,
+  });
+
+  const byContestType = breakdown(results, (r) => r.contestType, metrics);
+  const byBuyIn = breakdown(results, (r) => buyInTier(r.entryFeeCents), metrics);
+  const byEntrySize = breakdown(results, (r) => entrySizeTier(r.fieldSize), metrics);
+  const bySlate = breakdown(results, (r) => r.slate.slateName, metrics);
+  const bySport = breakdown(results, (r) => r.slate.sport, metrics);
+  const byLineupCount = breakdown(results, (r) => lineupCountTier(r.numberOfEntries), metrics);
+  const byStack = breakdown(linkedResults, (r) => r.linkedLineup!.stackSummary, metrics);
+  const bySalaryRemaining = breakdown(linkedResults, (r) => salaryRemainingTier(r.linkedLineup!.salaryUsed), metrics);
+  const byOwnershipRange = breakdown(linkedResults, (r) => ownershipRangeTier(r.linkedLineup!.totalOwnership), metrics);
 
   let cumulative = 0;
   const bankrollTrend = results.map((r) => {
@@ -137,10 +184,72 @@ export default async function ResultsPage() {
             </Card>
           </div>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>All tracked results</CardTitle>
+              <CardDescription>
+                Link a result to a SlateEdge-generated lineup to unlock stack/salary/ownership breakdowns below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contest</TableHead>
+                    <TableHead>Slate</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Entries</TableHead>
+                    <TableHead>Net</TableHead>
+                    <TableHead>Linked lineup</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.contestName}</TableCell>
+                      <TableCell className="text-xs text-ink-400">{r.slate.slateName}</TableCell>
+                      <TableCell>{r.contestType}</TableCell>
+                      <TableCell>{r.numberOfEntries}</TableCell>
+                      <TableCell className={r.netProfitLossCents >= 0 ? 'text-teal-300' : 'text-rose-400'}>
+                        {formatCents(r.netProfitLossCents)}
+                      </TableCell>
+                      <TableCell>
+                        <LinkLineupSelect
+                          resultId={r.id}
+                          linkedLineupId={r.linkedLineupId}
+                          options={lineupsBySlate.get(r.slateId) ?? []}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <DeleteResultButton resultId={r.id} contestName={r.contestName} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <BreakdownTable title="By sport" rows={bySport} />
           <BreakdownTable title="By contest type" rows={byContestType} />
           <BreakdownTable title="By buy-in level" rows={byBuyIn} />
           <BreakdownTable title="By entry-size tier" rows={byEntrySize} />
+          <BreakdownTable title="By lineup count" rows={byLineupCount} />
           <BreakdownTable title="By slate" rows={bySlate} />
+
+          {linkedResults.length === 0 ? (
+            <Callout variant="info" title="Stack, salary, and ownership breakdowns">
+              Link at least one result above to a SlateEdge-generated lineup to see breakdowns by stack construction,
+              salary remaining, and total lineup ownership.
+            </Callout>
+          ) : (
+            <>
+              <BreakdownTable title="By stack construction" rows={byStack} />
+              <BreakdownTable title="By salary remaining" rows={bySalaryRemaining} />
+              <BreakdownTable title="By ownership range" rows={byOwnershipRange} />
+            </>
+          )}
         </>
       )}
     </div>
@@ -167,6 +276,7 @@ function BreakdownTable({
   title: string;
   rows: { key: string; count: number; entries: number; fees: number; winnings: number; net: number; roi: number | null }[];
 }) {
+  if (rows.length === 0) return null;
   return (
     <Card>
       <CardHeader>
@@ -188,7 +298,7 @@ function BreakdownTable({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.key}>
-                <TableCell>{r.key}</TableCell>
+                <TableCell className="max-w-xs whitespace-normal text-xs">{r.key}</TableCell>
                 <TableCell>{r.count}</TableCell>
                 <TableCell>{r.entries}</TableCell>
                 <TableCell>{formatCents(r.fees)}</TableCell>

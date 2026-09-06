@@ -3,7 +3,7 @@ import { getSessionUserId } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { toCsv } from '@/lib/csv/engine';
 import { logAudit } from '@/lib/audit';
-import { DEFAULT_ROSTER_SLOTS } from '@/lib/optimizer/types';
+import { DEFAULT_ROSTER_SLOTS, buildSlotLabels } from '@/lib/optimizer/types';
 
 // Exports generated lineups to a CSV the user can review and manually upload
 // wherever they enter contests. SlateEdge never uploads, submits, or connects
@@ -48,14 +48,5 @@ export async function GET(req: NextRequest) {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="slateedge-lineups-${runId}.csv"`,
     },
-  });
-}
-
-function buildSlotLabels(rosterSlots: string[]): string[] {
-  const counts: Record<string, number> = {};
-  return rosterSlots.map((slot) => {
-    counts[slot] = (counts[slot] ?? 0) + 1;
-    const total = rosterSlots.filter((s) => s === slot).length;
-    return total > 1 ? `${slot}${counts[slot]}` : slot;
   });
 }

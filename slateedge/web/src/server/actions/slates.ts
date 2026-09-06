@@ -53,5 +53,5 @@ export async function deleteSlateAction(formData: FormData) {
   await prisma.slate.delete({ where: { id: slate.id } });
   await logAudit(user.id, 'slate.delete', { slateName: slate.slateName }, { type: 'Slate', id: slate.id });
   revalidatePath('/slates');
-  redirect('/slates');
+  revalidatePath('/dashboard');
 }

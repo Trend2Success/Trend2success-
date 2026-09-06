@@ -18,6 +18,15 @@ export interface OptimizerPlayerInput {
   excluded: boolean;
 }
 
+/** A per-player exposure override entered on the Lineup Builder page. `min`/`max`
+ * are percentages (0-100); either may be omitted to fall back to the global default. */
+export interface PlayerExposureOverride {
+  player_id: string;
+  label: string;
+  min?: number;
+  max?: number;
+}
+
 export interface GroupRule {
   type: 'at_least' | 'at_most' | 'exactly' | 'if_then' | 'exclude_together';
   player_ids: string[];
@@ -164,6 +173,19 @@ export const DEFAULT_STACK_RULES: StackRules = {
 export const DEFAULT_ROSTER_SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DST'];
 export const DEFAULT_FLEX_POSITIONS = ['RB', 'WR', 'TE'];
 export const DEFAULT_SALARY_CAP = 50000;
+
+/** Turns roster slots like ["QB","RB","RB",...] into unique column labels like
+ * ["QB","RB1","RB2",...], matching how the optimizer service names duplicate
+ * slots in each lineup's `roster` map. Used by CSV export on both the API
+ * route and the Portfolio Review export configuration UI. */
+export function buildSlotLabels(rosterSlots: string[]): string[] {
+  const counts: Record<string, number> = {};
+  return rosterSlots.map((slot) => {
+    counts[slot] = (counts[slot] ?? 0) + 1;
+    const total = rosterSlots.filter((s) => s === slot).length;
+    return total > 1 ? `${slot}${counts[slot]}` : slot;
+  });
+}
 
 export interface LineupPreset {
   name: string;

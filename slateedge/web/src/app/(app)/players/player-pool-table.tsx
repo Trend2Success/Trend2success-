@@ -8,15 +8,17 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  Table as ReactTable,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input, Label } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import type { PlayerRow } from '@/lib/types';
 import { LockExcludeButtons, NotesDialog, TagsDialog } from './player-row-actions';
 
@@ -66,6 +68,7 @@ export function PlayerPoolTable({ rows }: { rows: PlayerRow[] }) {
       {
         accessorKey: 'name',
         header: 'Player',
+        enableHiding: false,
         cell: ({ row }) => (
           <div>
             <p className="font-medium text-ink-50">{row.original.name}</p>
@@ -114,9 +117,13 @@ export function PlayerPoolTable({ rows }: { rows: PlayerRow[] }) {
     []
   );
 
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
+
   const table = useReactTable({
     data: filteredRows,
     columns,
+    state: { columnVisibility },
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -126,6 +133,10 @@ export function PlayerPoolTable({ rows }: { rows: PlayerRow[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-ink-400">Filters</p>
+        <ColumnVisibilityDialog table={table} />
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
         <Input placeholder="Search name…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} />
         <FilterSelect label="Position" value={position} onChange={setPosition} options={['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']} />
@@ -203,6 +214,39 @@ export function PlayerPoolTable({ rows }: { rows: PlayerRow[] }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ColumnVisibilityDialog({ table }: { table: ReactTable<PlayerRow> }) {
+  const [open, setOpen] = useState(false);
+  const columns = table.getAllLeafColumns().filter((c) => c.getCanHide());
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" size="sm" variant="outline">
+          <Columns3 className="mr-1 h-3.5 w-3.5" /> Columns
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Show/hide columns</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2">
+          {columns.map((column) => (
+            <label key={column.id} className="flex items-center gap-2 text-sm">
+              <Checkbox checked={column.getIsVisible()} onCheckedChange={(v) => column.toggleVisibility(v === true)} />
+              {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
+            </label>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

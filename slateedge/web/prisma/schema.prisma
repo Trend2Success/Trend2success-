@@ -30,6 +30,7 @@ model User {
   lineupRuns    LineupRun[]
   simulationRuns SimulationRun[]
   projectionEdits ProjectionAdjustment[]
+  lineupPresets LineupPreset[]
 
   @@map("users")
 }
@@ -240,6 +241,25 @@ model ProjectionAdjustment {
 // ---------------------------------------------------------------------------
 // Lineup building
 // ---------------------------------------------------------------------------
+
+// A user-saved optimizer configuration ("preset"). The four built-in presets
+// (Cash Conservative, Single-Entry GPP, 3-Max GPP, 20-Max GPP) are just
+// starting-point constants in code, not rows here — this table is for the
+// user's own saved/edited variants, explicitly labeled "starting points, not
+// proven strategies" everywhere they appear in the UI.
+model LineupPreset {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  settingsJson Json     // full Lineup Builder form state, reloaded verbatim when applied
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@map("lineup_presets")
+}
+
 model LineupRun {
   id             String   @id @default(cuid())
   userId         String

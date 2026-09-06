@@ -2,6 +2,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getActiveSlate } from '@/lib/activeSlate';
 import { AppShell } from '@/components/app-shell';
+import { UndoProvider } from '@/components/undo-provider';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -15,12 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <AppShell
-      displayName={user.displayName || user.email}
-      slates={slates.map((s) => ({ ...s, contestDate: s.contestDate.toISOString() }))}
-      activeSlateId={activeSlate?.id}
-    >
-      {children}
-    </AppShell>
+    <UndoProvider>
+      <AppShell
+        displayName={user.displayName || user.email}
+        slates={slates.map((s) => ({ ...s, contestDate: s.contestDate.toISOString() }))}
+        activeSlateId={activeSlate?.id}
+      >
+        {children}
+      </AppShell>
+    </UndoProvider>
   );
 }

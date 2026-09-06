@@ -1,16 +1,28 @@
 'use client';
 
-import { cloneElement, useMemo, useState } from 'react';
+import { cloneElement, useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Callout } from '@/components/ui/callout';
+import { Badge } from '@/components/ui/badge';
 import { runOptimizerAction, LineupFormState } from '@/server/actions/lineups';
+import { deleteLineupPresetAction } from '@/server/actions/presets';
 import { AiAssistant } from './ai-assistant';
 import { GroupBuilder } from './group-builder';
-import { LINEUP_PRESETS, GroupRule } from '@/lib/optimizer/types';
+import { RosterEditor } from './roster-editor';
+import { ExposureOverrides } from './exposure-overrides';
+import { SavePresetDialog } from './save-preset-dialog';
+import {
+  LINEUP_PRESETS,
+  GroupRule,
+  PlayerExposureOverride,
+  DEFAULT_ROSTER_SLOTS,
+  DEFAULT_FLEX_POSITIONS,
+} from '@/lib/optimizer/types';
 import type { ProposedRulePatch } from '@/lib/ai-assistant/parseRules';
 
 interface FormSettings {
@@ -27,6 +39,7 @@ interface FormSettings {
   minTotalProjection: string;
   minTotalCeiling: string;
   globalMaxExposurePct: string;
+  globalMinExposurePct: string;
   weightProjection: string;
   weightCeiling: string;
   weightLeverage: string;
@@ -38,6 +51,14 @@ interface FormSettings {
   allowDstVsOffense: boolean;
   reproducible: boolean;
   randomSeed: string;
+}
+
+interface FullSnapshot {
+  settings: FormSettings;
+  rosterSlots: string[];
+  flexPositions: string[];
+  groups: GroupRule[];
+  exposureOverrides: PlayerExposureOverride[];
 }
 
 const DEFAULTS: FormSettings = {
@@ -54,6 +75,7 @@ const DEFAULTS: FormSettings = {
   minTotalProjection: '',
   minTotalCeiling: '',
   globalMaxExposurePct: '',
+  globalMinExposurePct: '',
   weightProjection: '1',
   weightCeiling: '0',
   weightLeverage: '0',
@@ -76,21 +98,34 @@ function SubmitButton() {
   );
 }
 
+export interface SavedPreset {
+  id: string;
+  name: string;
+  settingsJson: unknown;
+}
+
 export function LineupBuilderForm({
   slateId,
   salaryCapDefault,
   playerOptions,
+  savedPresets,
 }: {
   slateId: string;
   salaryCapDefault: number;
   playerOptions: { id: string; label: string }[];
+  savedPresets: SavedPreset[];
 }) {
+  const router = useRouter();
+  const [deleting, startDeleteTransition] = useTransition();
   const [settings, setSettings] = useState<FormSettings>({
     ...DEFAULTS,
     salaryCap: String(salaryCapDefault),
     maxSalary: String(salaryCapDefault),
   });
+  const [rosterSlots, setRosterSlots] = useState<string[]>(DEFAULT_ROSTER_SLOTS);
+  const [flexPositions, setFlexPositions] = useState<string[]>(DEFAULT_FLEX_POSITIONS);
   const [groups, setGroups] = useState<GroupRule[]>([]);
+  const [exposureOverrides, setExposureOverrides] = useState<PlayerExposureOverride[]>([]);
   const [state, formAction] = useFormState(runOptimizerAction, {} as LineupFormState);
 
   function set<K extends keyof FormSettings>(key: K, value: FormSettings[K]) {
@@ -122,6 +157,14 @@ export function LineupBuilderForm({
     }));
   }
 
+  function applySnapshot(snapshot: Partial<FullSnapshot>, name: string) {
+    if (snapshot.settings) setSettings({ ...DEFAULTS, ...snapshot.settings, presetName: name });
+    if (snapshot.rosterSlots) setRosterSlots(snapshot.rosterSlots);
+    if (snapshot.flexPositions) setFlexPositions(snapshot.flexPositions);
+    if (snapshot.groups) setGroups(snapshot.groups);
+    if (snapshot.exposureOverrides) setExposureOverrides(snapshot.exposureOverrides);
+  }
+
   function applyAiPatch(patch: ProposedRulePatch) {
     setSettings((s) => ({
       ...s,
@@ -147,6 +190,14 @@ export function LineupBuilderForm({
   }
 
   const groupsJson = useMemo(() => JSON.stringify(groups), [groups]);
+  const rosterSlotsJson = useMemo(() => JSON.stringify(rosterSlots), [rosterSlots]);
+  const flexPositionsJson = useMemo(() => JSON.stringify(flexPositions), [flexPositions]);
+  const perPlayerExposureJson = useMemo(() => JSON.stringify(exposureOverrides), [exposureOverrides]);
+
+  function snapshotJson(): string {
+    const snapshot: FullSnapshot = { settings, rosterSlots, flexPositions, groups, exposureOverrides };
+    return JSON.stringify(snapshot);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -157,18 +208,60 @@ export function LineupBuilderForm({
           <CardTitle>Presets</CardTitle>
           <CardDescription>Starting points only — not proven strategies. Fully editable below.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {['Custom', ...LINEUP_PRESETS.map((p) => p.name)].map((name) => (
-            <Button
-              key={name}
-              type="button"
-              size="sm"
-              variant={settings.presetName === name ? 'default' : 'outline'}
-              onClick={() => applyPreset(name)}
-            >
-              {name}
-            </Button>
-          ))}
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {['Custom', ...LINEUP_PRESETS.map((p) => p.name)].map((name) => (
+              <Button
+                key={name}
+                type="button"
+                size="sm"
+                variant={settings.presetName === name ? 'default' : 'outline'}
+                onClick={() => applyPreset(name)}
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+
+          {savedPresets.length > 0 ? (
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-400">Your saved presets</p>
+              <div className="flex flex-wrap gap-2">
+                {savedPresets.map((p) => (
+                  <div key={p.id} className="flex items-center gap-1 rounded-md border border-graphite-600 bg-graphite-900 pl-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={settings.presetName === p.name ? 'default' : 'ghost'}
+                      onClick={() => applySnapshot(p.settingsJson as Partial<FullSnapshot>, p.name)}
+                    >
+                      {p.name}
+                    </Button>
+                    <button
+                      type="button"
+                      className="se-focus-ring px-2 text-xs text-ink-600 hover:text-rose-400"
+                      disabled={deleting}
+                      aria-label={`Delete preset ${p.name}`}
+                      onClick={() => {
+                        const fd = new FormData();
+                        fd.set('presetId', p.id);
+                        startDeleteTransition(async () => {
+                          await deleteLineupPresetAction(fd);
+                          router.refresh();
+                        });
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div>
+            <SavePresetDialog getSnapshotJson={snapshotJson} />
+          </div>
         </CardContent>
       </Card>
 
@@ -176,6 +269,9 @@ export function LineupBuilderForm({
         <input type="hidden" name="slateId" value={slateId} />
         <input type="hidden" name="presetName" value={settings.presetName} />
         <input type="hidden" name="groupsJson" value={groupsJson} />
+        <input type="hidden" name="rosterSlotsJson" value={rosterSlotsJson} />
+        <input type="hidden" name="flexPositionsJson" value={flexPositionsJson} />
+        <input type="hidden" name="perPlayerExposureJson" value={perPlayerExposureJson} />
         <input type="hidden" name="allowRbWithQb" value={String(settings.allowRbWithQb)} />
         <input type="hidden" name="allowDstVsOffense" value={String(settings.allowDstVsOffense)} />
         <input type="hidden" name="reproducible" value={String(settings.reproducible)} />
@@ -183,28 +279,39 @@ export function LineupBuilderForm({
         <Card>
           <CardHeader>
             <CardTitle>Roster construction</CardTitle>
-            <CardDescription>NFL Classic: QB, RB, RB, WR, WR, WR, TE, FLEX (RB/WR/TE), DST.</CardDescription>
+            <CardDescription>
+              Default NFL Classic: QB, RB, RB, WR, WR, WR, TE, FLEX (RB/WR/TE), DST — fully editable since roster
+              rules can change.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field label="Number of lineups (1-150)">
-              <Input
-                name="numLineups"
-                type="number"
-                min="1"
-                max="150"
-                value={settings.numLineups}
-                onChange={(e) => set('numLineups', e.target.value)}
-              />
-            </Field>
-            <Field label="Salary cap">
-              <Input name="salaryCap" type="number" value={settings.salaryCap} onChange={(e) => set('salaryCap', e.target.value)} />
-            </Field>
-            <Field label="Min salary spent">
-              <Input name="minSalary" type="number" value={settings.minSalary} onChange={(e) => set('minSalary', e.target.value)} />
-            </Field>
-            <Field label="Max salary spent">
-              <Input name="maxSalary" type="number" value={settings.maxSalary} onChange={(e) => set('maxSalary', e.target.value)} />
-            </Field>
+          <CardContent className="flex flex-col gap-4">
+            <RosterEditor
+              rosterSlots={rosterSlots}
+              setRosterSlots={setRosterSlots}
+              flexPositions={flexPositions}
+              setFlexPositions={setFlexPositions}
+            />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="Number of lineups (1-150)">
+                <Input
+                  name="numLineups"
+                  type="number"
+                  min="1"
+                  max="150"
+                  value={settings.numLineups}
+                  onChange={(e) => set('numLineups', e.target.value)}
+                />
+              </Field>
+              <Field label="Salary cap">
+                <Input name="salaryCap" type="number" value={settings.salaryCap} onChange={(e) => set('salaryCap', e.target.value)} />
+              </Field>
+              <Field label="Min salary spent">
+                <Input name="minSalary" type="number" value={settings.minSalary} onChange={(e) => set('minSalary', e.target.value)} />
+              </Field>
+              <Field label="Max salary spent">
+                <Input name="maxSalary" type="number" value={settings.maxSalary} onChange={(e) => set('maxSalary', e.target.value)} />
+              </Field>
+            </div>
           </CardContent>
         </Card>
 
@@ -212,53 +319,70 @@ export function LineupBuilderForm({
           <CardHeader>
             <CardTitle>Diversification & exposure</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field label="Min unique players between lineups">
-              <Input name="minUnique" type="number" min="0" value={settings.minUnique} onChange={(e) => set('minUnique', e.target.value)} />
-            </Field>
-            <Field label="Global max exposure per player (%)">
-              <Input
-                name="globalMaxExposurePct"
-                type="number"
-                min="0"
-                max="100"
-                value={settings.globalMaxExposurePct}
-                onChange={(e) => set('globalMaxExposurePct', e.target.value)}
-              />
-            </Field>
-            <Field label="Max players from one team">
-              <Input name="maxPerTeam" type="number" min="1" value={settings.maxPerTeam} onChange={(e) => set('maxPerTeam', e.target.value)} />
-            </Field>
-            <Field label="Global max total lineup ownership (%)">
-              <Input
-                name="globalMaxOwnership"
-                type="number"
-                value={settings.globalMaxOwnership}
-                onChange={(e) => set('globalMaxOwnership', e.target.value)}
-              />
-            </Field>
-            <Field label="Min players per game">
-              <Input name="minPerGame" type="number" value={settings.minPerGame} onChange={(e) => set('minPerGame', e.target.value)} />
-            </Field>
-            <Field label="Max players per game">
-              <Input name="maxPerGame" type="number" value={settings.maxPerGame} onChange={(e) => set('maxPerGame', e.target.value)} />
-            </Field>
-            <Field label="Min total lineup projection">
-              <Input
-                name="minTotalProjection"
-                type="number"
-                value={settings.minTotalProjection}
-                onChange={(e) => set('minTotalProjection', e.target.value)}
-              />
-            </Field>
-            <Field label="Min total lineup ceiling">
-              <Input
-                name="minTotalCeiling"
-                type="number"
-                value={settings.minTotalCeiling}
-                onChange={(e) => set('minTotalCeiling', e.target.value)}
-              />
-            </Field>
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="Min unique players between lineups">
+                <Input name="minUnique" type="number" min="0" value={settings.minUnique} onChange={(e) => set('minUnique', e.target.value)} />
+              </Field>
+              <Field label="Global max exposure per player (%)">
+                <Input
+                  name="globalMaxExposurePct"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={settings.globalMaxExposurePct}
+                  onChange={(e) => set('globalMaxExposurePct', e.target.value)}
+                />
+              </Field>
+              <Field label="Global min exposure per player (%)">
+                <Input
+                  name="globalMinExposurePct"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={settings.globalMinExposurePct}
+                  onChange={(e) => set('globalMinExposurePct', e.target.value)}
+                />
+              </Field>
+              <Field label="Max players from one team">
+                <Input name="maxPerTeam" type="number" min="1" value={settings.maxPerTeam} onChange={(e) => set('maxPerTeam', e.target.value)} />
+              </Field>
+              <Field label="Global max total lineup ownership (%)">
+                <Input
+                  name="globalMaxOwnership"
+                  type="number"
+                  value={settings.globalMaxOwnership}
+                  onChange={(e) => set('globalMaxOwnership', e.target.value)}
+                />
+              </Field>
+              <Field label="Min players per game">
+                <Input name="minPerGame" type="number" value={settings.minPerGame} onChange={(e) => set('minPerGame', e.target.value)} />
+              </Field>
+              <Field label="Max players per game">
+                <Input name="maxPerGame" type="number" value={settings.maxPerGame} onChange={(e) => set('maxPerGame', e.target.value)} />
+              </Field>
+              <Field label="Min total lineup projection">
+                <Input
+                  name="minTotalProjection"
+                  type="number"
+                  value={settings.minTotalProjection}
+                  onChange={(e) => set('minTotalProjection', e.target.value)}
+                />
+              </Field>
+              <Field label="Min total lineup ceiling">
+                <Input
+                  name="minTotalCeiling"
+                  type="number"
+                  value={settings.minTotalCeiling}
+                  onChange={(e) => set('minTotalCeiling', e.target.value)}
+                />
+              </Field>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-200">Per-player exposure rules</p>
+              <ExposureOverrides playerOptions={playerOptions} overrides={exposureOverrides} setOverrides={setExposureOverrides} />
+            </div>
           </CardContent>
         </Card>
 
@@ -360,8 +484,9 @@ export function LineupBuilderForm({
           </Callout>
         ) : null}
 
-        <div>
+        <div className="flex items-center gap-2">
           <SubmitButton />
+          {settings.presetName !== 'Custom' ? <Badge variant="outline">Using preset: {settings.presetName}</Badge> : null}
         </div>
       </form>
     </div>

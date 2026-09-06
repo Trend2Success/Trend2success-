@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DeleteLineupButton, DeleteRunButton } from './delete-buttons';
+import { DeleteLineupButton, DeleteRunButton, RegenerateLineupButton } from './delete-buttons';
+import { ExportControls } from './export-controls';
+import { buildSlotLabels, OptimizeRequest } from '@/lib/optimizer/types';
 
 export default async function PortfolioPage({ searchParams }: { searchParams: { runId?: string } }) {
   const user = await requireUser();
@@ -26,11 +28,25 @@ export default async function PortfolioPage({ searchParams }: { searchParams: { 
     return <EmptyState title="No lineups yet" description="Generate lineups on the Lineup Builder page first." />;
   }
 
-  const lineups = await prisma.lineup.findMany({
-    where: { runId: activeRun.id },
-    include: { players: { include: { player: true } } },
-    orderBy: { modelScore: 'desc' },
-  });
+  const [lineups, projectionSources, lastImport] = await Promise.all([
+    prisma.lineup.findMany({
+      where: { runId: activeRun.id },
+      include: { players: { include: { player: true } } },
+      orderBy: { modelScore: 'desc' },
+    }),
+    prisma.projectionSource.findMany({ where: { slateId: slate.id } }),
+    prisma.importBatch.findFirst({ where: { slateId: slate.id }, orderBy: { createdAt: 'desc' } }),
+  ]);
+
+  const runSettings = activeRun.settingsJson as unknown as OptimizeRequest;
+  const w = runSettings.objective_weights;
+  const sr = runSettings.stack_rules;
+  const formulaSummary = [
+    `Model score = ${w.projection}×projection + ${w.ceiling}×ceiling + ${w.leverage}×leverage − ${w.ownership_penalty}×ownership.`,
+    `QB stack: ${sr.qb_stack_min}-${sr.qb_stack_max} pass catchers from the QB's team, min ${sr.bring_back_min} opponent bring-back.`,
+    `RB with own-team QB: ${sr.allow_rb_with_qb ? 'allowed' : 'not allowed'}. DST vs. rostered offense: ${sr.allow_dst_vs_offense ? 'allowed' : 'not allowed'}.`,
+  ].join(' ');
+  const rosterSummary = `Roster: ${runSettings.roster_slots.join(', ')} · Salary cap $${runSettings.salary_cap.toLocaleString()}.`;
 
   const totalLineups = lineups.length;
 
@@ -106,16 +122,48 @@ export default async function PortfolioPage({ searchParams }: { searchParams: { 
             {slate.slateName} · Run: {activeRun.presetName} · {new Date(activeRun.createdAt).toLocaleString()}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="secondary" size="sm">
-            <a href={`/api/export/lineups?runId=${activeRun.id}&field=name`}>Export CSV (names)</a>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <a href={`/api/export/lineups?runId=${activeRun.id}&field=id`}>Export CSV (ids)</a>
-          </Button>
-          <DeleteRunButton runId={activeRun.id} />
-        </div>
+        <DeleteRunButton runId={activeRun.id} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Export</CardTitle>
+          <CardDescription>
+            You verify and upload this file yourself — SlateEdge never connects to or uploads for any contest
+            operator.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ExportControls runId={activeRun.id} defaultSlots={buildSlotLabels(runSettings.roster_slots)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Model transparency</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-1 text-xs text-ink-300">
+          <p>
+            <span className="text-ink-400">Input data as of:</span>{' '}
+            {lastImport ? new Date(lastImport.createdAt).toLocaleString() : 'unknown'}
+          </p>
+          <p>
+            <span className="text-ink-400">Data sources:</span>{' '}
+            {projectionSources.length > 0 ? projectionSources.map((s) => s.sourceLabel).join(', ') : 'none imported'}
+          </p>
+          <p>
+            <span className="text-ink-400">Formula/rule summary:</span> {rosterSummary} {formulaSummary}
+          </p>
+          <p>
+            <span className="text-ink-400">Settings version:</span> {activeRun.settingsVersion} ·{' '}
+            <span className="text-ink-400">Seed:</span> {activeRun.seedUsed ?? 'random (not reproducible)'}
+          </p>
+          <p className="mt-1 text-amber-300">
+            Every figure above is an estimate derived from your inputs, not a prediction or guarantee. Historical
+            results do not ensure future results.
+          </p>
+        </CardContent>
+      </Card>
 
       {runs.length > 1 ? (
         <div className="flex flex-wrap gap-2">
@@ -171,7 +219,10 @@ export default async function PortfolioPage({ searchParams }: { searchParams: { 
                   <TableCell>{l.modelScore.toFixed(1)}</TableCell>
                   <TableCell className="max-w-xs whitespace-normal text-xs text-ink-300">{l.stackSummary}</TableCell>
                   <TableCell>
-                    <DeleteLineupButton lineupId={l.id} />
+                    <div className="flex gap-1">
+                      <RegenerateLineupButton lineupId={l.id} />
+                      <DeleteLineupButton lineupId={l.id} index={i} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

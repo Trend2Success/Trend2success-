@@ -126,9 +126,11 @@ cd web && npm run typecheck
 cd web && npm run test:e2e
 ```
 
-All 30 Python unit tests and 30 TypeScript unit tests pass as of this build; the two Playwright
-end-to-end tests (sign in → browse the demo slate → generate a lineup → review it in Portfolio;
-and the responsible-play footer) pass against a live local stack.
+All 30 Python unit tests and 30 TypeScript unit tests pass as of this build; all 5 Playwright
+end-to-end tests pass against a live local stack — the core workflow (sign in → browse the demo
+slate → generate a lineup → review it in Portfolio) and footer, plus configurable roster/
+per-player exposure/saveable presets, single-lineup regeneration with undo-on-delete, and
+importing + linking + deleting a contest result.
 
 ## Known limitations
 

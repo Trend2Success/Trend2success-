@@ -3,20 +3,21 @@
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { deleteLineupAction, deleteLineupRunAction } from '@/server/actions/lineups';
+import { useUndoable } from '@/components/undo-provider';
+import { deleteLineupAction, deleteLineupRunAction, regenerateLineupAction } from '@/server/actions/lineups';
 
-export function DeleteLineupButton({ lineupId }: { lineupId: string }) {
+export function DeleteLineupButton({ lineupId, index }: { lineupId: string; index: number }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { scheduleUndoable } = useUndoable();
+
   return (
     <Button
       size="sm"
       variant="ghost"
-      disabled={pending}
       onClick={() => {
-        const fd = new FormData();
-        fd.set('lineupId', lineupId);
-        startTransition(async () => {
+        scheduleUndoable(`Lineup #${index + 1} will be deleted.`, async () => {
+          const fd = new FormData();
+          fd.set('lineupId', lineupId);
           await deleteLineupAction(fd);
           router.refresh();
         });
@@ -27,19 +28,44 @@ export function DeleteLineupButton({ lineupId }: { lineupId: string }) {
   );
 }
 
-export function DeleteRunButton({ runId }: { runId: string }) {
+export function RegenerateLineupButton({ lineupId }: { lineupId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      disabled={pending}
+      onClick={() => {
+        const fd = new FormData();
+        fd.set('lineupId', lineupId);
+        startTransition(async () => {
+          const result = await regenerateLineupAction(fd);
+          if (result.error) {
+            alert(result.error);
+          }
+          router.refresh();
+        });
+      }}
+    >
+      {pending ? 'Regenerating…' : 'Regenerate'}
+    </Button>
+  );
+}
+
+export function DeleteRunButton({ runId }: { runId: string }) {
+  const router = useRouter();
+  const { scheduleUndoable } = useUndoable();
+
   return (
     <Button
       size="sm"
       variant="destructive"
-      disabled={pending}
       onClick={() => {
-        if (!confirm('Delete this entire run and all its lineups?')) return;
-        const fd = new FormData();
-        fd.set('runId', runId);
-        startTransition(async () => {
+        scheduleUndoable('This entire run and all its lineups will be deleted.', async () => {
+          const fd = new FormData();
+          fd.set('runId', runId);
           await deleteLineupRunAction(fd);
           router.refresh();
         });

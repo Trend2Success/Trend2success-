@@ -15,6 +15,7 @@ export type AuditAction =
   | 'export.csv'
   | 'slate.delete'
   | 'results.delete'
+  | 'results.link'
   | 'data.deleteAll'
   | 'settings.update'
   | 'auth.login'
