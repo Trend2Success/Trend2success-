@@ -1,0 +1,338 @@
+// SlateEdge — Prisma schema
+// Personal-use DFS decision-support tool. All data below is either user-uploaded
+// CSV data or fictional seed/demo data. No data is ever fetched from DraftKings
+// or any other site.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth (v1: simple local single/multi user account, architected so a real
+// OAuth/cloud auth provider can replace the credentials check later without
+// changing the schema).
+// ---------------------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  createdAt    DateTime @default(now())
+
+  settings      Settings?
+  auditLogs     AuditLog[]
+  slates        Slate[]
+  lineupRuns    LineupRun[]
+  simulationRuns SimulationRun[]
+  projectionEdits ProjectionAdjustment[]
+
+  @@map("users")
+}
+
+model Settings {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionBudgetCents    Int     @default(10000)
+  stopLossCents         Int     @default(5000)
+  chalkThresholdPct     Float   @default(25)
+  contrarianOwnershipPct Float  @default(8)
+  contrarianCeilingPctile Float @default(70)
+  defaultSalaryCap      Int     @default(50000)
+  featureFlags          Json    @default("{}")
+  updatedAt             DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String   // import.salary, import.projection, import.results, player.edit, optimizer.run, export.csv, data.deleteAll, ...
+  entityType String?
+  entityId   String?
+  detail     Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Slates & Players
+// ---------------------------------------------------------------------------
+model Slate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slateId     String   // external id from CSV (may repeat across sources, unique per user)
+  slateName   String
+  sport       String   @default("NFL")
+  contestDate DateTime
+  isDemo      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  players      Player[]
+  lineupRuns   LineupRun[]
+  simulationRuns SimulationRun[]
+  results      ContestResult[]
+  importBatches ImportBatch[]
+
+  @@unique([userId, slateId])
+  @@map("slates")
+}
+
+model ImportBatch {
+  id         String   @id @default(cuid())
+  slateId    String
+  slate      Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  kind       String   // salary | projection | results
+  sourceLabel String  // "User Upload" | user-defined authorized source name
+  fileName   String?
+  rowCount   Int
+  errorCount Int
+  createdAt  DateTime @default(now())
+
+  @@map("import_batches")
+}
+
+model Player {
+  id              String   @id @default(cuid())
+  slateId         String
+  slate           Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  playerId        String   // external id from CSV, unique within slate
+  playerName      String
+  team            String
+  opponent        String
+  position        String   // QB, RB, WR, TE, DST
+  rosterPositions String   // raw eligibility string from CSV e.g. "RB/FLEX"
+  salary          Int
+  gameInfo        String?
+  gameId          String   // derived key grouping both teams in a game, used for stacking/correlation
+  startTime       DateTime?
+  status          String   @default("ACTIVE") // ACTIVE, QUESTIONABLE, OUT, ...
+
+  locked   Boolean @default(false)
+  excluded Boolean @default(false)
+  notes    String?
+  tags     PlayerTag[]
+
+  projection ProjectionSnapshot?
+  adjustments ProjectionAdjustment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineupPlayers LineupPlayer[]
+
+  @@unique([slateId, playerId])
+  @@index([slateId, position])
+  @@map("players")
+}
+
+enum TagName {
+  CORE
+  STRONG_PLAY
+  TOURNAMENT_PIVOT
+  VALUE
+  FADE
+  INJURY_WATCH
+  CUSTOM
+}
+
+model PlayerTag {
+  id       String  @id @default(cuid())
+  playerId String
+  player   Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tag      TagName
+  label    String? // used when tag == CUSTOM
+
+  @@unique([playerId, tag, label])
+  @@map("player_tags")
+}
+
+// ---------------------------------------------------------------------------
+// Projections
+// ---------------------------------------------------------------------------
+
+// One row per (player, source). "source" default is the imported salary/projection
+// CSV; additional sources can be imported and blended in the Projection Lab.
+model ProjectionSource {
+  id          String   @id @default(cuid())
+  slateId     String
+  sourceLabel String   // e.g. "User Upload", "My Model v2"
+  createdAt   DateTime @default(now())
+
+  rows ProjectionRow[]
+
+  @@unique([slateId, sourceLabel])
+  @@map("projection_sources")
+}
+
+model ProjectionRow {
+  id                    String   @id @default(cuid())
+  sourceId              String
+  source                ProjectionSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  playerId              String   // external player_id, matched at blend time
+  playerName            String
+  projectedPoints       Float
+  floor                 Float?
+  ceiling               Float?
+  standardDeviation     Float?
+  projectedOwnership    Float?
+  expectedUsage         Float?
+  targetShareOrUsage    Float?
+  notes                 String?
+  lastUpdated           DateTime?
+  createdAt             DateTime @default(now())
+
+  @@unique([sourceId, playerId])
+  @@map("projection_rows")
+}
+
+// The current blended/adjusted projection actually used across the app for a
+// given player on a given slate. Recomputed whenever blend weights or manual
+// adjustments change; every change is captured in ProjectionAdjustment for
+// the audit trail.
+model ProjectionSnapshot {
+  id                 String   @id @default(cuid())
+  playerId           String   @unique
+  player             Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  basePoints         Float    // blended value before manual adjustments
+  finalPoints        Float    // after manual adjustments
+  floor              Float?
+  ceiling             Float?
+  standardDeviation  Float?
+  projectedOwnership Float?
+  value              Float?   // finalPoints / (salary/1000)
+  ceilingValue       Float?   // ceiling / (salary/1000)
+  leverageScore      Float?   // normalized ceiling pctile - normalized ownership pctile
+  chalkFlag          Boolean  @default(false)
+  contrarianFlag     Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+
+  @@map("projection_snapshots")
+}
+
+model ProjectionAdjustment {
+  id           String   @id @default(cuid())
+  playerId     String
+  player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  editorUserId String
+  editor       User     @relation(fields: [editorUserId], references: [id])
+  kind         String   // "blend_weight" | "manual_points" | "manual_percent"
+  beforeValue  Float
+  afterValue   Float
+  detail       Json?    // e.g. { sourceWeights: {...} } or { deltaPoints, deltaPercent }
+  createdAt    DateTime @default(now())
+
+  @@index([playerId, createdAt])
+  @@map("projection_adjustments")
+}
+
+// ---------------------------------------------------------------------------
+// Lineup building
+// ---------------------------------------------------------------------------
+model LineupRun {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slateId        String
+  slate          Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  presetName     String   @default("Custom")
+  settingsJson   Json     // full request payload sent to optimizer service
+  settingsVersion String  @default("1.0")
+  seedUsed       Int?
+  warnings       Json     @default("[]")
+  createdAt      DateTime @default(now())
+
+  lineups Lineup[]
+
+  @@map("lineup_runs")
+}
+
+model Lineup {
+  id               String   @id @default(cuid())
+  runId            String
+  run              LineupRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  externalLineupId String
+  salaryUsed       Int
+  totalProjection  Float
+  totalCeiling     Float
+  totalOwnership   Float
+  leverageScore    Float
+  modelScore       Float
+  stackSummary     String
+  createdAt        DateTime @default(now())
+
+  players LineupPlayer[]
+  result  ContestResult?
+
+  @@map("lineups")
+}
+
+model LineupPlayer {
+  id       String @id @default(cuid())
+  lineupId String
+  lineup   Lineup @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  slot     String // QB, RB1, RB2, WR1, WR2, WR3, TE, FLEX, DST
+
+  @@unique([lineupId, playerId])
+  @@map("lineup_players")
+}
+
+// ---------------------------------------------------------------------------
+// Simulation
+// ---------------------------------------------------------------------------
+model SimulationRun {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slateId        String
+  slate          Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  distribution   String   // truncated_normal | lognormal
+  numSimulations Int
+  settingsJson   Json
+  resultsJson    Json
+  seedUsed       Int?
+  createdAt      DateTime @default(now())
+
+  @@map("simulation_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Contest & Results Tracker
+// ---------------------------------------------------------------------------
+model ContestResult {
+  id                String   @id @default(cuid())
+  slateId           String
+  slate             Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  contestName       String
+  contestType       String   // Cash, Double-Up, GPP, Single-Entry, 3-Max, 20-Max, ...
+  fieldSize         Int?
+  entryFeeCents     Int
+  numberOfEntries   Int
+  totalEntryFeesCents Int
+  totalWinningsCents Int
+  netProfitLossCents Int
+  externalLineupRef String?  // free-text lineup id/name from the imported results CSV
+  linkedLineupId    String?  @unique
+  linkedLineup      Lineup?  @relation(fields: [linkedLineupId], references: [id])
+  finalRank         Int?
+  lineupPoints      Float?
+  cashLine          Float?
+  topOnePercentLine Float?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  @@map("contest_results")
+}
